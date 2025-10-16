@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF--8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connect Four</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+        }
+        /* Style for the game board grid */
+        .board {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            grid-template-rows: repeat(6, 1fr);
+            gap: 8px;
+            background-color: #0d6efd; /* A classic blue */
+            padding: 10px;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2), 0 6px 6px rgba(0,0,0,0.25);
+            width: 100%;
+            max-width: 580px;
+            aspect-ratio: 7 / 6; /* Maintain aspect ratio */
+        }
+        /* Style for each cell/slot in the board */
+        .cell {
+            background-color: #1e293b; /* A dark background for empty slots */
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            aspect-ratio: 1 / 1;
+            transition: transform 0.2s ease-in-out;
+        }
+        /* Add a hover effect to show which column is active */
+        .column:hover {
+            transform: translateY(-5px);
+            cursor: pointer;
+        }
+        /* Style for the game pieces */
+        .piece {
+            width: 85%;
+            height: 85%;
+            border-radius: 50%;
+            animation: drop 0.4s ease-out forwards;
+        }
+        /* Player 1's piece color (Red) */
+        .player1 {
+            background-color: #dc3545;
+            box-shadow: inset 0 -5px 10px rgba(0,0,0,0.3);
+        }
+        /* Player 2's piece color (Yellow) */
+        .player2 {
+            background-color: #ffc107;
+            box-shadow: inset 0 -5px 10px rgba(0,0,0,0.3);
+        }
+        /* Winning piece highlight */
+        .winner-piece {
+            animation: pulse 0.8s infinite;
+        }
+
+        /* Animation for a piece dropping into a slot */
+        @keyframes drop {
+            from {
+                transform: translateY(-200px) scale(0.5);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0) scale(1);
+                opacity: 1;
+            }
+        }
+        /* Animation for pulsing winning pieces */
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: inset 0 -5px 10px rgba(0,0,0,0.3), 0 0 10px #fff, 0 0 20px #fff;
+            }
+            50% {
+                transform: scale(1.1);
+                box-shadow: inset 0 -5px 10px rgba(0,0,0,0.3), 0 0 20px #fff, 0 0 40px #fff;
+            }
+        }
+        
+        /* Styles for the Math Challenge Modal Table */
+        #proportionality-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        #proportionality-table th, #proportionality-table td {
+            border: 1px solid #475569;
+            padding: 8px;
+            text-align: center;
+        }
+        #proportionality-table th {
+            background-color: #334155;
+        }
+    </style>
+</head>
+<body class="bg-slate-800 text-white flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="text-center mb-6">
+        <h1 class="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-yellow-400 to-red-500">Connect Four</h1>
+        <p id="status" class="text-slate-300 text-lg mt-2 h-7">Player 1's Turn</p>
+    </div>
+
+    <!-- The main game board container -->
+    <div id="game-board-container" class="board"></div>
+
+    <button id="newGameBtn" class="mt-8 px-8 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 transition-transform transform hover:scale-105">
+        New Game
+    </button>
+    
+    <!-- Math Challenge Modal -->
+    <div id="mathModal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50 transition-opacity duration-300">
+        <div class="bg-slate-700 rounded-2xl shadow-xl p-8 w-full max-w-md text-center">
+            <h2 class="text-2xl font-bold mb-4">Math Challenge!</h2>
+            <p id="challenge-prompt" class="mb-4 text-slate-300">Find the Constant of Proportionality (k) where y = kx.</p>
+            <div id="proportionality-table" class="mb-6 text-left mx-auto w-48">
+                <!-- Table will be generated here by JavaScript -->
+            </div>
+            <input type="number" id="k-answer" class="text-black w-full p-3 rounded-lg text-xl text-center" placeholder="Enter k">
+            <button id="submitAnswerBtn" class="mt-6 w-full px-6 py-3 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 transition">Submit Answer</button>
+        </div>
+    </div>
+
+
+    <script>
+        const boardElement = document.getElementById('game-board-container');
+        const statusElement = document.getElementById('status');
+        const newGameBtn = document.getElementById('newGameBtn');
+        const mathModal = document.getElementById('mathModal');
+        const proportionalityTableElement = document.getElementById('proportionality-table');
+        const kAnswerInput = document.getElementById('k-answer');
+        const submitAnswerBtn = document.getElementById('submitAnswerBtn');
+        const challengePrompt = document.getElementById('challenge-prompt');
+
+        const ROWS = 6;
+        const COLS = 7;
+
+        let board = [];
+        let currentPlayer = 1;
+        let gameOver = false;
+        
+        let currentK = null;
+        let selectedColumn = null;
+
+        function initGame() {
+            board = Array(ROWS).fill(null).map(() => Array(COLS).fill(0));
+            currentPlayer = 1;
+            gameOver = false;
+            statusElement.textContent = "Player 1's Turn";
+            statusElement.className = 'text-slate-300 text-lg mt-2 h-7';
+            mathModal.classList.add('hidden');
+            renderBoard();
+        }
+
+        function renderBoard() {
+            boardElement.innerHTML = '';
+            for (let col = 0; col < COLS; col++) {
+                const columnElement = document.createElement('div');
+                columnElement.classList.add('column');
+                columnElement.dataset.col = col;
+                for (let row = 0; row < ROWS; row++) {
+                    const cellElement = document.createElement('div');
+                    cellElement.classList.add('cell');
+                    cellElement.dataset.row = row;
+                    cellElement.dataset.col = col;
+                    if (board[row][col] !== 0) {
+                        const pieceElement = document.createElement('div');
+                        pieceElement.classList.add('piece', `player${board[row][col]}`);
+                        cellElement.appendChild(pieceElement);
+                    }
+                    columnElement.appendChild(cellElement);
+                }
+                boardElement.appendChild(columnElement);
+            }
+        }
+        
+        // Checks what the result of a move *would* be (e.g. 3 in a row)
+        function checkPotentialResult(col, player) {
+            const row = findEmptyRow(col);
+            if (row === -1) return 0; // Column is full
+
+            const checkDirection = (r_offset, c_offset) => {
+                let count = 0;
+                for (let i = 1; i < 4; i++) {
+                    const r = row + r_offset * i;
+                    const c = col + c_offset * i;
+                    if (r >= 0 && r < ROWS && c >= 0 && c < COLS && board[r][c] === player) count++;
+                    else break;
+                }
+                for (let i = 1; i < 4; i++) {
+                    const r = row - r_offset * i;
+                    const c = col - c_offset * i;
+                    if (r >= 0 && r < ROWS && c >= 0 && c < COLS && board[r][c] === player) count++;
+                    else break;
+                }
+                return count + 1;
+            };
+
+            const directions = [{ r: 0, c: 1 }, { r: 1, c: 0 }, { r: 1, c: 1 }, { r: 1, c: -1 }];
+            let maxConnected = 0;
+            for (const dir of directions) {
+                const connectedInDir = checkDirection(dir.r, dir.c);
+                if (connectedInDir > maxConnected) maxConnected = connectedInDir;
+            }
+            return maxConnected;
+        }
+
+        function handleMove(event) {
+            if (gameOver) return;
+            const column = event.target.closest('.column');
+            if (!column) return;
+            const col = parseInt(column.dataset.col);
+            if (findEmptyRow(col) === -1) return;
+
+            // Determine challenge difficulty based on the potential move
+            const potentialConnection = checkPotentialResult(col, currentPlayer);
+            let difficulty = 'easy';
+            if (potentialConnection >= 4) {
+                difficulty = 'hard';
+            } else if (potentialConnection === 3) {
+                difficulty = 'medium';
+            }
+
+            selectedColumn = col;
+            showMathChallenge(difficulty);
+        }
+
+        function showMathChallenge(difficulty = 'easy') {
+            generateProportionalityProblem(difficulty);
+            kAnswerInput.value = '';
+            mathModal.classList.remove('hidden');
+            kAnswerInput.focus();
+        }
+
+        function generateProportionalityProblem(difficulty) {
+            let k;
+            const xValues = new Set();
+            while (xValues.size < 3) {
+                if (difficulty === 'hard') {
+                    // e.g., 2.1 to 11.9
+                    const x = ((Math.floor(Math.random() * 10) + 2) * 10 + Math.floor(Math.random() * 9) + 1) / 10;
+                    xValues.add(x);
+                } else {
+                    const x = Math.floor(Math.random() * 10) + 2; // x is an integer
+                    xValues.add(x);
+                }
+            }
+            const sortedX = Array.from(xValues).sort((a, b) => a - b);
+            
+            let promptText = "";
+            switch (difficulty) {
+                case 'hard':
+                    k = Math.floor(Math.random() * 11) + 2; // Whole number k
+                    promptText = "HARD: Find the whole number constant (k).";
+                    break;
+                case 'medium':
+                    const numerators = [1, 3, 5, 7]; // for k = 0.5, 1.5, 2.5, 3.5
+                    k = (numerators[Math.floor(Math.random() * numerators.length)]) / 2;
+                    promptText = "MEDIUM: Find the decimal constant (k).";
+                    break;
+                default: // 'easy'
+                    k = Math.floor(Math.random() * 11) + 2; // Integer k
+                    promptText = "Find the Constant of Proportionality (k) where y = kx.";
+                    break;
+            }
+            
+            currentK = k;
+            challengePrompt.textContent = promptText;
+
+            let tableHTML = '<table><thead><tr><th>x</th><th>y</th></tr></thead><tbody>';
+            sortedX.forEach(x => {
+                let y = k * x;
+                // Clean up floating point issues for display
+                if (typeof y === 'number' && !Number.isInteger(y)) {
+                    y = parseFloat(y.toFixed(2));
+                }
+                tableHTML += `<tr><td>${x}</td><td>${y}</td></tr>`;
+            });
+            tableHTML += '</tbody></table>';
+            proportionalityTableElement.innerHTML = tableHTML;
+        }
+
+        function handleAnswerSubmit() {
+            const userAnswer = parseFloat(kAnswerInput.value);
+            mathModal.classList.add('hidden');
+            if (userAnswer === currentK) {
+                placePieceAndContinue();
+            } else {
+                statusElement.textContent = `Incorrect! Player ${currentPlayer} loses a turn.`;
+                statusElement.className = 'text-yellow-400 text-lg mt-2 h-7 font-semibold';
+                setTimeout(() => { if (!gameOver) switchPlayer(); }, 1500);
+            }
+        }
+        
+        function placePieceAndContinue() {
+            const col = selectedColumn;
+            const row = findEmptyRow(col);
+            if (row === -1) return;
+
+            board[row][col] = currentPlayer;
+            animateAndPlacePiece(row, col);
+
+            if (checkWin(row, col)) {
+                gameOver = true;
+                statusElement.textContent = `Player ${currentPlayer} Wins!`;
+                statusElement.className = `text-lg mt-2 h-7 font-bold ${currentPlayer === 1 ? 'text-red-400' : 'text-yellow-400'}`;
+                return;
+            }
+
+            if (checkDraw()) {
+                gameOver = true;
+                statusElement.textContent = "It's a Draw!";
+                statusElement.className = 'text-slate-300 text-lg mt-2 h-7';
+                return;
+            }
+            switchPlayer();
+        }
+
+        function animateAndPlacePiece(row, col) {
+            const cell = document.querySelector(`.cell[data-row='${row}'][data-col='${col}']`);
+            if (cell) {
+                const piece = document.createElement('div');
+                piece.classList.add('piece', `player${currentPlayer}`);
+                cell.appendChild(piece);
+            }
+        }
+
+        function findEmptyRow(col) {
+            for (let row = ROWS - 1; row >= 0; row--) {
+                if (board[row][col] === 0) return row;
+            }
+            return -1;
+        }
+
+        function switchPlayer() {
+            currentPlayer = currentPlayer === 1 ? 2 : 1;
+            statusElement.textContent = `Player ${currentPlayer}'s Turn`;
+            statusElement.className = `text-slate-300 text-lg mt-2 h-7`;
+        }
+
+        function checkWin(row, col) {
+            const player = board[row][col];
+            const directions = [{ r: 0, c: 1 }, { r: 1, c: 0 }, { r: 1, c: 1 }, { r: 1, c: -1 }];
+            for (const dir of directions) {
+                let count = 1;
+                let currentPieces = [{row, col}];
+                for (let i = 1; i < 4; i++) {
+                    const r = row + dir.r * i, c = col + dir.c * i;
+                    if (r >= 0 && r < ROWS && c >= 0 && c < COLS && board[r][c] === player) {
+                        count++; currentPieces.push({row: r, col: c});
+                    } else break;
+                }
+                for (let i = 1; i < 4; i++) {
+                    const r = row - dir.r * i, c = col - dir.c * i;
+                    if (r >= 0 && r < ROWS && c >= 0 && c < COLS && board[r][c] === player) {
+                        count++; currentPieces.push({row: r, col: c});
+                    } else break;
+                }
+                if (count >= 4) {
+                    highlightWinningPieces(currentPieces);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function highlightWinningPieces(pieces) {
+            pieces.forEach(p => {
+                const cell = document.querySelector(`.cell[data-row='${p.row}'][data-col='${p.col}']`);
+                if (cell && cell.firstChild) cell.firstChild.classList.add('winner-piece');
+            });
+        }
+
+        function checkDraw() {
+            return board[0].every(cell => cell !== 0);
+        }
+
+        boardElement.addEventListener('click', handleMove);
+        newGameBtn.addEventListener('click', initGame);
+        submitAnswerBtn.addEventListener('click', handleAnswerSubmit);
+        kAnswerInput.addEventListener('keyup', (event) => { if (event.key === 'Enter') handleAnswerSubmit(); });
+
+        initGame();
+    </script>
+</body>
+</html>
+
