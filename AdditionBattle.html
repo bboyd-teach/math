@@ -42,22 +42,31 @@
         }
 
         /* Style for the fraction display */
+        .mixed-num {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.15em;
+        }
+        .mixed-num > span:first-child {
+            font-size: 1.1em; /* Make whole number slightly larger */
+        }
         .frac {
             display: inline-block;
-            vertical-align: middle;
+            vertical-align: -0.4em; /* Aligns middle of fraction with text */
             margin: 0 0.2em;
             text-align: center;
-        }
-        .frac > sup {
-            display: block;
-            border-bottom: 2px solid currentColor;
             font-size: 0.9em;
-            padding: 0 0.1em;
+            line-height: 1.2; /* Added line-height for spacing */
         }
-        .frac > sub {
+        .frac > .num {
             display: block;
-            font-size: 0.9em;
-            padding: 0 0.1em;
+            padding: 0 0.2em;
+            /* No border */
+        }
+        .frac > .den {
+            display: block;
+            padding: 0 0.2em;
+            border-top: 2px solid currentColor; /* Border on top of denominator */
         }
         
         /* Answer input fields */
@@ -235,12 +244,15 @@
          */
         function formatFraction(whole, num, den) {
             if (num === 0) {
-                return `${whole}`;
+                return `<span class="mixed-num"><span>${whole}</span></span>`;
             }
+            
+            const fracHtml = `<span class="frac"><span class="num">${num}</span><span class="den">${den}</span></span>`;
+
             if (whole === 0) {
-                return `<span class="frac"><sup>${num}</sup>&frasl;<sub>${den}</sub></span>`;
+                return `<span class="mixed-num">${fracHtml}</span>`;
             }
-            return `${whole} <span class="frac"><sup>${num}</sup>&frasl;<sub>${den}</sub></span>`;
+            return `<span class="mixed-num"><span>${whole}</span> ${fracHtml}</span>`;
         }
 
         // --- Game Logic Functions ---
@@ -417,8 +429,8 @@
          * Simulates the CPU's turn.
          */
         function cpuTurn() {
-            // 85% chance of getting it right
-            const isCorrect = Math.random() > 0.15;
+            // 75% chance of getting it right
+            const isCorrect = Math.random() > 0.25;
             
             if (isCorrect) {
                 feedbackMessage.innerHTML = `<span class="text-green-600">✅ CPU answered correctly!</span>`;
@@ -542,4 +554,5 @@
     </script>
 </body>
 </html>
+
 
